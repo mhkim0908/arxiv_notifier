@@ -1,0 +1,24 @@
+{
+    "NV Center": {
+        "keywords": [
+            "nv center"
+        ],
+        "categories": [
+            "quant-ph",
+            "quant-comp",
+            "cond-mat.mes-hall"
+        ]
+    },
+    "Holography": {
+        "keywords": [
+            "digital holography",
+            "computer generated holography"
+        ],
+        "categories": [
+            "quant-ph",
+            "cs.quant-ph",
+            "quant-comp",
+            "physics.optics"
+        ]
+    }
+}
