@@ -135,7 +135,7 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                     continue
                 seen.add(uid)
 
-                title = entry.title.strip()
+                title = " ".join(entry.title.split())
                 abstract = entry.summary
 
                 if should_skip(f"{title} {abstract}", exclude):
@@ -192,7 +192,7 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> Optional[str]:
         [
             "",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "자동으로 생성된 arXiv 논문 알림입니다.",
+            "Automatically generated arXiv paper notification.",
             "설정을 변경하려면 topics.json 파일을 수정하세요.",
         ]
     )
