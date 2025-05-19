@@ -20,9 +20,12 @@ import os
 import smtplib
 import textwrap
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
+import urllib.parse  # ← 상단 import 추가
 
 import feedparser
+
+
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------
 # User‑adjustable constants
@@ -66,7 +69,9 @@ def load_topics(path: str) -> Dict[str, Any]:
 
 
 def make_query(keyword: str, categories: List[str]) -> str:
-    kw = f"all:{keyword}"
+    kw_enc = urllib.parse.quote_plus(keyword)  # 공백 → '+', 기타 특수문자 인코딩
+    kw = f"all:{kw_enc}"
+
     if categories:
         cat = "+OR+".join(f"cat:{c}" for c in categories)
         return f"({cat})+AND+{kw}"
