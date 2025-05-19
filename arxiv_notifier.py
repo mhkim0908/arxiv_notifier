@@ -1,209 +1,205 @@
-import os
-import feedparser
-import smtplib
+#!/usr/bin/env python3
+"""
+arxiv_notifier.py
+-----------------
+Send daily arXiv digests for user‑defined topics.
+
+Highlights
+~~~~~~~~~~
+* Topics & category filters are stored in ``topics.json``.
+* Ignores papers whose title/abstract contain any keyword in ``exclude_keywords``.
+* Truncates long titles / abstracts.
+* Plain‑text email formatted for readability.
+"""
+
+from __future__ import annotations
+
 import hashlib
-import textwrap
 import json
+import os
+import smtplib
+import textwrap
 from email.mime.text import MIMEText
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
-EMAIL_ADDRESS_ENV = "EMAIL_ADDRESS"
-EMAIL_PASSWORD_ENV = "EMAIL_PASSWORD"
-TO_EMAIL_ENV = "TO_EMAIL"
+import feedparser
+
+# ---------------------------------------------------------
+# User‑adjustable constants
+# ---------------------------------------------------------
+
+ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
 TOPIC_FILE = "topics.json"
-MAX_RESULTS = 10
-TITLE_MAX_CHARS = 150
-ABSTRACT_MAX_CHARS = 800
-GLOBAL_EXCLUDE_KEYWORDS = ["review", "survey", "comment on", "corrigendum"]
+
+MAX_RESULTS_DEFAULT = 10  # fallback per‑query result count
+TITLE_MAX = 120  # characters
+ABSTRACT_MAX = 600  # characters
+WRAP_WIDTH = 78  # characters when wrapping abstract text
+
+GLOBAL_EXCLUDE = {
+    "review",
+    "survey",
+    "comment on",
+    "corrigendum",
+}
+
+# ---------------------------------------------------------
+# Utility helpers
+# ---------------------------------------------------------
 
 
-def check_env_vars():
-    required_vars = [EMAIL_ADDRESS_ENV, EMAIL_PASSWORD_ENV, TO_EMAIL_ENV]
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    if missing_vars:
-        print(
-            f"Error: The following environment variables are not set: {', '.join(missing_vars)}"
-        )
-        exit(1)
+def getenv_or_exit(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise SystemExit(f"[config] required environment variable '{name}' is missing")
+    return value
 
 
-def load_topics_from_json(filepath: str) -> Dict[str, Dict[str, Any]]:
+def load_topics(path: str) -> Dict[str, Any]:
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"Error: Configuration file ({filepath}) not found.")
-        exit(1)
-    except json.JSONDecodeError:
-        print(
-            f"Error: The JSON format of the configuration file ({filepath}) is invalid."
-        )
-        exit(1)
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except FileNotFoundError as exc:
+        raise SystemExit(f"[config] topics file '{path}' not found") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"[config] invalid JSON in '{path}'") from exc
 
 
-def build_query(keyword: str, categories: List[str]) -> str:
+def make_query(keyword: str, categories: List[str]) -> str:
+    kw = f"all:{keyword}"
     if categories:
-        cat_part = "(" + "+OR+".join(f"cat:{c.strip()}" for c in categories) + ")"
-        return f"{cat_part}+AND+all:{keyword}"
-    else:
-        return f"all:{keyword}"
+        cat = "+OR+".join(f"cat:{c}" for c in categories)
+        return f"({cat})+AND+{kw}"
+    return kw
 
 
-def send_email(
-    subject: str, body: str, email_address: str, email_password: str, to_email: str
-) -> None:
-    try:
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = subject
-        msg["From"] = email_address
-        msg["To"] = to_email
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(email_address, email_password)
-            server.sendmail(email_address, to_email, msg.as_string())
-    except smtplib.SMTPException as e:
-        print(f"Error occurred while sending email: {e}")
-    except Exception as e:
-        print(f"Unknown error occurred while sending email: {e}")
+def fetch_entries(query: str, max_results: int) -> List[Any]:
+    url = (
+        "http://export.arxiv.org/api/query?search_query="
+        f"{query}&start=0&max_results={max_results}"
+    )
+    feed = feedparser.parse(url)
+    return feed.entries
 
 
-def fetch_arxiv_entries(query: str, max_results: int) -> List[Any]:
-    url = f"http://export.arxiv.org/api/query?search_query={query}&start=0&max_results={max_results}"
-    try:
-        feed = feedparser.parse(url)
-        if feed.bozo:
-            print(
-                f"Warning: There might be an issue parsing the feed. URL: {url}, Reason: {feed.bozo_exception}"
-            )
-        return feed.entries
-    except Exception as e:
-        print(f"Error occurred during arXiv API call (URL: {url}): {e}")
-        return []
+def normalize(text: str) -> str:
+    """Collapse whitespace and ensure each sentence ends with a period."""
+    sentences = [
+        s.strip().rstrip(".") + "."
+        for s in text.replace("\n", " ").split(". ")
+        if s.strip()
+    ]
+    return " ".join(sentences)
 
 
-def normalize_text(text: str) -> str:
-    lines = text.strip().replace("\n", " ").split(". ")
-    cleaned_lines = []
-    for line in lines:
-        stripped_line = line.strip()
-        if stripped_line:
-            if not stripped_line.endswith("."):
-                stripped_line += "."
-            cleaned_lines.append(stripped_line)
-    cleaned = "\n".join(cleaned_lines)
-    return textwrap.indent(cleaned, "    ")
+def wrap(text: str) -> str:
+    return textwrap.fill(text, WRAP_WIDTH, subsequent_indent="    ")
 
 
-def should_skip(title: str, summary: str, exclude_keywords: List[str]) -> bool:
-    lower_text = f"{title.lower()} {summary.lower()}"
-    return any(keyword.lower() in lower_text for keyword in exclude_keywords)
+def truncate(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
 
 
-def truncate_text(text: str, max_len: int) -> str:
-    return text if len(text) <= max_len else text[:max_len].rstrip() + "..."
+def should_skip(text: str, exclude: set[str]) -> bool:
+    lower = text.lower()
+    return any(k in lower for k in exclude)
 
 
-def fetch_and_group_papers(
-    topics_config: Dict[str, Dict[str, Any]],
-) -> Dict[str, List[Dict[str, str]]]:
+# ---------------------------------------------------------
+# Core logic
+# ---------------------------------------------------------
+
+
+def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
     results: Dict[str, List[Dict[str, str]]] = {}
-    seen_ids = set()
+    seen: set[str] = set()
 
-    for topic_name, config_data in topics_config.items():
-        keyword_list = config_data.get("keywords", [])
-        category_filters = config_data.get("categories", [])
-        topic_specific_exclude_keywords = config_data.get(
-            "exclude_keywords", GLOBAL_EXCLUDE_KEYWORDS
-        )
-        topic_max_results = config_data.get("max_results", MAX_RESULTS)
+    for topic, cfg in topics.items():
+        kw_list: List[str] = cfg.get("keywords", [])
+        cat_filter: List[str] = cfg.get("categories", [])
+        exclude = set(cfg.get("exclude_keywords", [])) | GLOBAL_EXCLUDE
+        max_results = int(cfg.get("max_results", MAX_RESULTS_DEFAULT))
 
-        collected_papers_for_topic: List[Dict[str, str]] = []
-        for kw in keyword_list:
-            print(f"Searching for keyword '{kw}' under topic '{topic_name}'...")
-            query = build_query(kw, category_filters)
-            entries = fetch_arxiv_entries(query, topic_max_results)
-            if not entries:
-                print(f"  No results found for keyword '{kw}'.")
-                continue
-
-            for entry in entries:
-                entry_id_suffix = entry.id.split("/")[-1]
-                uid = hashlib.sha1(entry_id_suffix.encode()).hexdigest()
-
-                if uid in seen_ids:
+        papers: List[Dict[str, str]] = []
+        for kw in kw_list:
+            for entry in fetch_entries(make_query(kw, cat_filter), max_results):
+                uid = hashlib.sha1(entry.id.encode()).hexdigest()
+                if uid in seen:
                     continue
-                seen_ids.add(uid)
+                seen.add(uid)
 
                 title = entry.title.strip()
-                summary = entry.summary
+                abstract = entry.summary
 
-                if should_skip(title, summary, topic_specific_exclude_keywords):
+                if should_skip(f"{title} {abstract}", exclude):
                     continue
 
-                normalized_summary = normalize_text(summary)
-                collected_papers_for_topic.append(
+                papers.append(
                     {
-                        "title": truncate_text(title, TITLE_MAX_CHARS),
-                        "link": entry.link.strip(),
-                        "summary": truncate_text(
-                            normalized_summary, ABSTRACT_MAX_CHARS
-                        ),
+                        "title": truncate(title, TITLE_MAX),
+                        "link": entry.link,
+                        "abstract": truncate(normalize(abstract), ABSTRACT_MAX),
                     }
                 )
 
-        if collected_papers_for_topic:
-            results[topic_name] = collected_papers_for_topic
-            print(
-                f"Found {len(collected_papers_for_topic)} new paper(s) for topic '{topic_name}'."
-            )
-        else:
-            print(f"No new papers found for topic '{topic_name}'.")
-
+        if papers:
+            results[topic] = papers
     return results
 
 
-def format_email_body(
-    papers_by_topic: Dict[str, List[Dict[str, str]]],
-) -> Optional[str]:
-    if not papers_by_topic:
+def build_email(papers: Dict[str, List[Dict[str, str]]]) -> Optional[str]:
+    if not papers:
         return None
 
-    email_parts: List[str] = ["📰 *New arXiv Papers by Topic*\n"]
-    for topic_name, papers in papers_by_topic.items():
-        email_parts.append(f"🔹 *{topic_name}* ({len(papers)} papers)\n")
-        for paper in papers:
-            title = paper["title"].replace("\n", " ").strip()
-            email_parts.append(f"• {title}")
-            email_parts.append(f"  🔗 {paper['link']}")
-            email_parts.append(f"  📄 Abstract:\n{paper['summary']}")
-        email_parts.append("")
+    parts: List[str] = ["📰  Daily arXiv digest", ""]
+    sep = "-" * WRAP_WIDTH
+    for topic, plist in papers.items():
+        parts.extend([f"🔹 {topic} ({len(plist)})", sep])
+        for p in plist:
+            parts.append(f"• {p['title']}")
+            parts.append(f"  ↳ {p['link']}")
+            parts.append("  Abstract:")
+            parts.append("    " + wrap(p["abstract"]))
+            parts.append("")  # blank line between papers
+        parts.append("")  # blank line between topics
+    return "\n".join(parts)
 
-    return "\n".join(email_parts)
+
+def send_email(
+    subject: str, body: str, sender: str, password: str, recipient: str
+) -> None:
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = recipient
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as s:
+        s.starttls()
+        s.login(sender, password)
+        s.sendmail(sender, [recipient], msg.as_string())
+
+
+# ---------------------------------------------------------
+# Entrypoint
+# ---------------------------------------------------------
+
+
+def main() -> None:
+    sender = getenv_or_exit("EMAIL_ADDRESS")
+    password = getenv_or_exit("EMAIL_PASSWORD")
+    recipient = getenv_or_exit("TO_EMAIL")
+
+    topics = load_topics(TOPIC_FILE)
+    papers = collect_papers(topics)
+    body = build_email(papers)
+
+    if body:
+        subject = "📰 New arXiv papers – " + ", ".join(papers.keys())
+        send_email(subject, body, sender, password, recipient)
+        print("[ok] email sent")
+    else:
+        print("[info] no new papers")
 
 
 if __name__ == "__main__":
-    check_env_vars()
-
-    EMAIL_ADDRESS = os.getenv(EMAIL_ADDRESS_ENV)
-    EMAIL_PASSWORD = os.getenv(EMAIL_PASSWORD_ENV)
-    TO_EMAIL = os.getenv(TO_EMAIL_ENV)
-
-    topics_data = load_topics_from_json(TOPIC_FILE)
-    papers_found = fetch_and_group_papers(topics_data)
-
-    email_body_content = format_email_body(papers_found)
-
-    if email_body_content:
-        found_topic_names = list(papers_found.keys())
-        subject_detail = (
-            ", ".join(found_topic_names) if found_topic_names else "General Topics"
-        )
-        email_subject = f"📰 New arXiv Papers: {subject_detail}"
-
-        print(f"\nAttempting to send email with subject: {email_subject}")
-        send_email(
-            email_subject, email_body_content, EMAIL_ADDRESS, EMAIL_PASSWORD, TO_EMAIL
-        )
-        print("✅ Email sent.")
-    else:
-        print("\n📭 No new papers to report.")
+    main()
