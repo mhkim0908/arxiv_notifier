@@ -1,19 +1,31 @@
+import os
 import feedparser
 import smtplib
-from email.mime.text import MIMEText
 import hashlib
-import os
+from email.mime.text import MIMEText
 
-TOPICS = {
-    "NV Center": "nv+center",
-    "Digital Holography": "digital+holography",
-    "CGH": "computer+generated+holography",
-}
-MAX_RESULTS = 10
-
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")  # GitHub Secrets에 저장됨
+# === 설정 ===
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
+TOPIC_FILE = "topics.txt"
+MAX_RESULTS = 10
+TITLE_MAX_CHARS = 150
+ABSTRACT_MAX_CHARS = 800
+EXCLUDE_KEYWORDS = ["review", "survey", "comment on", "corrigendum"]
+# =========================
+
+
+def load_topics(filepath):
+    topics = {}
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            if ":" in line:
+                category, keywords = line.strip().split(":", 1)
+                topics[category.strip()] = [
+                    kw.strip().replace(" ", "+") for kw in keywords.split(",")
+                ]
+    return topics
 
 
 def send_email(subject, body):
@@ -21,49 +33,80 @@ def send_email(subject, body):
     msg["Subject"] = subject
     msg["From"] = EMAIL_ADDRESS
     msg["To"] = TO_EMAIL
-
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
         server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
         server.sendmail(EMAIL_ADDRESS, TO_EMAIL, msg.as_string())
 
 
-def fetch_and_format():
-    notified = set()
-    new_papers = {}
-
-    for topic_name, keyword in TOPICS.items():
-        rss_url = f"http://export.arxiv.org/api/query?search_query=all:{keyword}&start=0&max_results={MAX_RESULTS}"
-        feed = feedparser.parse(rss_url)
-        entries = []
-        for entry in feed.entries:
-            uid = hashlib.sha1(entry.id.encode()).hexdigest()
-            if uid not in notified:
-                summary = entry.summary.replace("\n", " ").strip()
-                summary = "\n    " + "\n    ".join(summary.split(". "))
-                entries.append((entry.title.strip(), entry.link.strip(), summary))
-                notified.add(uid)
-        if entries:
-            new_papers[topic_name] = entries
-    return new_papers
+def fetch_arxiv_entries(keyword):
+    url = f"http://export.arxiv.org/api/query?search_query=all:{keyword}&start=0&max_results={MAX_RESULTS}"
+    return feedparser.parse(url).entries
 
 
-def format_email_body(papers_dict):
-    if not papers_dict:
+def normalize_text(text):
+    # 마침표 뒤 줄바꿈 정리
+    lines = text.strip().replace("\n", " ").split(". ")
+    return "\n    " + "\n    ".join(
+        line.strip() + "." if not line.endswith(".") else line for line in lines
+    )
+
+
+def should_skip(title, summary):
+    lower_text = f"{title.lower()} {summary.lower()}"
+    return any(keyword.lower() in lower_text for keyword in EXCLUDE_KEYWORDS)
+
+
+def truncate_text(text, max_len):
+    return text if len(text) <= max_len else text[:max_len].rstrip() + "..."
+
+
+def fetch_and_group_papers(topics):
+    results = {}
+    seen_ids = set()
+    for category, keyword_list in topics.items():
+        combined_entries = []
+        for keyword in keyword_list:
+            entries = fetch_arxiv_entries(keyword)
+            for entry in entries:
+                uid = hashlib.sha1(entry.id.encode()).hexdigest()
+                if uid in seen_ids:
+                    continue
+                title = entry.title.strip()
+                summary = entry.summary.strip().replace("\n", " ")
+                if should_skip(title, summary):
+                    continue
+                summary = normalize_text(summary)
+                combined_entries.append(
+                    {
+                        "title": truncate_text(title, TITLE_MAX_CHARS),
+                        "link": entry.link.strip(),
+                        "summary": truncate_text(summary, ABSTRACT_MAX_CHARS),
+                    }
+                )
+                seen_ids.add(uid)
+        if combined_entries:
+            results[category] = combined_entries
+    return results
+
+
+def format_email(papers_by_topic):
+    if not papers_by_topic:
         return None
-    body = "📰 New arXiv Papers by Topic:\n\n"
-    for category, papers in papers_dict.items():
-        body += f"🔹 {category}:\n"
-        for title, link, summary in papers:
-            body += f"- {title}\n  {link}\n  Abstract:\n{summary}\n\n"
-    return body
+    email = "📰 New arXiv Papers by Topic\n\n"
+    for category, papers in papers_by_topic.items():
+        email += f"🔹 {category}\n"
+        for paper in papers:
+            email += f"• {paper['title']}\n  ↳ {paper['link']}\n  Abstract:\n{paper['summary']}\n\n"
+    return email
 
 
 if __name__ == "__main__":
-    papers = fetch_and_format()
-    email_body = format_email_body(papers)
+    topics = load_topics(TOPIC_FILE)
+    papers = fetch_and_group_papers(topics)
+    email_body = format_email(papers)
     if email_body:
-        send_email("New arXiv Papers: NV / Holography / CGH", email_body)
-        print("Email sent.")
+        send_email("📰 New arXiv Papers: NV / Holography / CGH", email_body)
+        print("✅ Email sent.")
     else:
-        print("No new papers found.")
+        print("📭 No new papers.")
