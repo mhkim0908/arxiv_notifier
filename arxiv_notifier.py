@@ -152,16 +152,44 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> Optional[str]:
         return None
 
     parts: List[str] = ["📰  Daily arXiv digest", ""]
-    sep = "-" * WRAP_WIDTH
-    for topic, plist in papers.items():
-        parts.extend([f"🔹 {topic} ({len(plist)})", sep])
-        for p in plist:
-            parts.append(f"• {p['title']}")
-            parts.append(f"  ↳ {p['link']}")
-            parts.append("  Abstract:")
-            parts.append("    " + wrap(p["abstract"]))
-            parts.append("")  # blank line between papers
-        parts.append("")  # blank line between topics
+
+    for i, (topic, plist) in enumerate(papers.items()):
+        # 주제별 상단 구분선 추가
+        topic_header = f"📌 {topic.upper()} ({len(plist)})"
+        parts.extend([topic_header, "=" * len(topic_header)])
+
+        for j, p in enumerate(plist):
+            # 논문 번호 추가 및 제목 강조
+            parts.append(f"{j+1}. 📄 {p['title']}")
+            parts.append(f"   🔗 {p['link']}")
+            parts.append("")  # 제목/링크와 초록 사이 공백
+            parts.append("   📝 Abstract:")
+            # 초록 들여쓰기 및 포맷팅 개선
+            abstract_lines = wrap(p["abstract"]).split("\n")
+            parts.extend([f"      {line}" for line in abstract_lines])
+
+            # 논문 간 구분선 (마지막 논문 제외)
+            if j < len(plist) - 1:
+                parts.append("")
+                parts.append("   " + "-" * 40)
+                parts.append("")
+
+        # 주제 간 구분 (마지막 주제 제외)
+        if i < len(papers) - 1:
+            parts.append("")
+            parts.append("・" * 30)
+            parts.append("")
+
+    # 푸터 추가
+    parts.extend(
+        [
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "자동으로 생성된 arXiv 논문 알림입니다.",
+            "설정을 변경하려면 topics.json 파일을 수정하세요.",
+        ]
+    )
+
     return "\n".join(parts)
 
 
