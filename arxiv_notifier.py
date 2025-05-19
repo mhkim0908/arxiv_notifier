@@ -37,7 +37,7 @@ TOPIC_FILE = "topics.json"
 MAX_RESULTS_DEFAULT = 10  # fallback per‑query result count
 TITLE_MAX = 120  # characters
 ABSTRACT_MAX = 600  # characters
-WRAP_WIDTH = 78  # characters when wrapping abstract text
+WRAP_WIDTH = None  # characters when wrapping abstract text
 
 GLOBAL_EXCLUDE = {
     "review",
@@ -98,6 +98,8 @@ def normalize(text: str) -> str:
 
 
 def wrap(text: str) -> str:
+    if WRAP_WIDTH is None:
+        return text
     return textwrap.fill(text, WRAP_WIDTH, subsequent_indent="    ")
 
 
