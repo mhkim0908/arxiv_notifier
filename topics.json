@@ -6,7 +6,7 @@
         "categories": [
             "quant-ph",
             "quant-comp",
-            "cond-mat.mes-hall"
+            "physics.app-ph"
         ]
     },
     "Holography": {
@@ -18,7 +18,8 @@
             "quant-ph",
             "cs.quant-ph",
             "quant-comp",
-            "physics.optics"
+            "physics.optics",
+            "physics.app-ph"
         ]
     }
 }
