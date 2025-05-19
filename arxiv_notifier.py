@@ -69,13 +69,21 @@ def load_topics(path: str) -> Dict[str, Any]:
 
 
 def make_query(keyword: str, categories: List[str]) -> str:
-    kw_enc = urllib.parse.quote_plus(keyword)  # 공백 → '+', 기타 특수문자 인코딩
-    kw = f"all:{kw_enc}"
+    """
+    Build an arXiv API query string.
+
+    * keyword → exact phrase search in title OR abstract.
+    * categories → OR-joined cat:XXX filters.
+    """
+    phrase = f'"{keyword}"'  # double-quoted phrase
+    kw_enc = urllib.parse.quote_plus(phrase)
+
+    kw_part = f"(ti:{kw_enc}+OR+abs:{kw_enc})"
 
     if categories:
-        cat = "+OR+".join(f"cat:{c}" for c in categories)
-        return f"({cat})+AND+{kw}"
-    return kw
+        cat_part = "+OR+".join(f"cat:{c}" for c in categories)
+        return f"({cat_part})+AND+{kw_part}"
+    return kw_part
 
 
 def fetch_entries(query: str, max_results: int) -> List[Any]:
