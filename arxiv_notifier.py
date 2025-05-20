@@ -3,12 +3,14 @@
 arxiv_notifier.py
 ────────────────────────────────────────────────────────────
 * AI 요약 토글: AI_SUMMARIZE = True / False
-* 요약 모델 · API 키는 환경변수(OPENAI_API_KEY)로 관리
+* 요약 모델과 API 키는 환경변수(OPENAI_API_KEY)로 관리
+* 최근 DAYS_BACK 일 이내에 올라온 논문만 메일에 포함
 """
 
 from __future__ import annotations
+import email.utils as eut
 import hashlib, json, os, smtplib, urllib.parse
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional
@@ -16,17 +18,18 @@ from typing import Any, Dict, List, Optional
 import feedparser
 
 # ──────────────── AI 요약 설정 ────────────────
-AI_SUMMARIZE = True  # ← 여기서 켜거나 끔
+AI_SUMMARIZE = True  # ← 켜거나 끔
 MODEL_ID = "gpt-4.5-preview"  # 필요 시 변경
 if AI_SUMMARIZE:
     import openai
 
-    openai.api_key = os.getenv("OPENAI_API_KEY")  # GitHub Secret
+    openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # ─────────────── 기본 설정 ────────────────
 ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
 TOPIC_FILE = "topics.json"
 MAX_RESULTS_DEFAULT = 10
+DAYS_BACK = 1  # 최근 n 일 논문만
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
 
@@ -54,8 +57,21 @@ def make_query(keyword: str, cats: List[str]) -> str:
 
 
 def fetch_entries(q: str, n: int) -> List[Any]:
-    url = f"http://export.arxiv.org/api/query?search_query={q}&start=0&max_results={n}"
+    url = (
+        "http://export.arxiv.org/api/query?search_query="
+        f"{q}&start=0&max_results={n}"
+        "&sortBy=submittedDate&sortOrder=descending"  # 최신순
+    )
     return feedparser.parse(url).entries
+
+
+def is_recent(entry) -> bool:
+    """Return True if the entry was submitted within DAYS_BACK days."""
+    pub_utc = datetime.fromtimestamp(
+        eut.mktime_tz(eut.parsedate_tz(entry.published)),
+        tz=timezone.utc,
+    )
+    return pub_utc >= datetime.now(tz=timezone.utc) - timedelta(days=DAYS_BACK)
 
 
 def truncate(t: str, m: int) -> str:
@@ -94,6 +110,9 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                 make_query(kw, cfg.get("categories", [])),
                 int(cfg.get("max_results", MAX_RESULTS_DEFAULT)),
             ):
+                if not is_recent(e):
+                    continue  # 최근 DAYS_BACK 일 이내가 아니면 skip
+
                 uid = hashlib.sha1(e.id.encode()).hexdigest()
                 if uid in seen:
                     continue
@@ -146,7 +165,8 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
             lines.append("・" * 30 + "\n")
     lines += [
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "자동 생성된 arXiv 알림입니다. topics.json을 수정해 주제를 바꿔보세요.",
+        f"지난 {DAYS_BACK}일 이내에 제출된 논문만 포함했습니다. "
+        "topics.json을 수정해 주제를 바꿔보세요.",
     ]
     return "\n".join(lines)
 
@@ -171,7 +191,8 @@ def main() -> None:
     first_topic, first_list = next(iter(papers.items()))
     subject = str(
         Header(
-            f"{date.today():%Y-%m-%d} - 오늘의 arXiv - {first_topic} ({len(first_list)})",
+            f"{date.today():%Y-%m-%d} - 오늘의 arXiv - "
+            f"{first_topic} ({len(first_list)})",
             "utf-8",
         )
     )
