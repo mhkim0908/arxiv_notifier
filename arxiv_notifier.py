@@ -33,7 +33,7 @@ if AI_SUMMARIZE:
 # ─────────────── 기본 설정 ────────────────
 ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
 TOPIC_FILE = "topics.json"
-MAX_RESULTS_DEFAULT = 10
+MAX_RESULTS_DEFAULT = 20
 DAYS_BACK = 2  # 최근 N 일
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
@@ -52,13 +52,14 @@ def load_topics(path: str) -> Dict[str, Any]:
         return json.load(fh)
 
 
-def make_query(keyword: str, cats: List[str]) -> str:
-    phrase = urllib.parse.quote_plus(f'"{keyword}"')
-    kw = f"(ti:{phrase}+OR+abs:{phrase})"
+def make_query(keyword: str, cats: list[str]) -> str:
+    # neutral atom quantum gate → neutral AND atom AND quantum AND gate
+    terms = "+AND+".join(f"(ti:{w}+OR+abs:{w})" for w in keyword.split())
+    kw_part = f"({terms})"
     if cats:
-        cat = "+OR+".join(f"cat:{c}" for c in cats)
-        return f"({cat})+AND+{kw}"
-    return kw
+        cat_part = "+OR+".join(f"cat:{c}" for c in cats)
+        return f"({cat_part})+AND+{kw_part}"
+    return kw_part
 
 
 def fetch_entries(q: str, n: int) -> List[Any]:
