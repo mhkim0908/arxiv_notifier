@@ -1,2 +1,2 @@
-feedparser
-openai
+feedparser>=6.0
+openai>=1.14          # AI_SUMMARIZE = True 일 때만 필요

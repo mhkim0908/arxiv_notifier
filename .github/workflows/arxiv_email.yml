@@ -2,22 +2,24 @@ name: arXiv Email Notifier
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # UTC 기준 → KST 아침 8시
-  workflow_dispatch:      # 수동 실행도 허용
+    - cron: '0 23 * * *'       # UTC 23:00 → KST 08:00
+  workflow_dispatch:           # 수동 실행 허용
 
 jobs:
   send-email:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Install deps
-      run: pip install feedparser openai
-    - name: Send arXiv digest
-      env:
-        EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-        TO_EMAIL: ${{ secrets.TO_EMAIL }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}   # 요약 켜는 경우
-      run: |
-        python arxiv_notifier.py --summary --model gpt-4.1-mini
+      - uses: actions/checkout@v4
+
+      # 요약을 켜 둔 상태(AI_SUMMARIZE = True)라면 openai까지 설치
+      - name: Install deps
+        run: pip install feedparser openai
+
+      - name: Send arXiv digest
+        env:
+          EMAIL_ADDRESS:   ${{ secrets.EMAIL_ADDRESS }}
+          EMAIL_PASSWORD:  ${{ secrets.EMAIL_PASSWORD }}
+          TO_EMAIL:        ${{ secrets.TO_EMAIL }}
+          OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY }}   # AI_SUMMARIZE=True일 때만 필요
+        run: |
+          python arxiv_notifier.py
