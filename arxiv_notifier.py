@@ -17,7 +17,7 @@ import feedparser
 
 # ──────────────── AI 요약 설정 ────────────────
 AI_SUMMARIZE = True  # ← 여기서 켜거나 끔
-MODEL_ID = "gpt-4o-mini"  # 필요 시 변경
+MODEL_ID = "gpt-4.5-preview"  # 필요 시 변경
 if AI_SUMMARIZE:
     import openai
 
