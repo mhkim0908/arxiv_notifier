@@ -47,7 +47,8 @@
             "neutral atom quantum gate*",
             "rydberg quantum comput*",
             "atomic qubit array*",
-            "atom rearrange*"
+            "atom rearrange*",
+            "quantum"
         ],
         "categories": [
             "quant-ph",
