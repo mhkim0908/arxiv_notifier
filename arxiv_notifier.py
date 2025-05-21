@@ -3,7 +3,6 @@
 arxiv_notifier.py
 ────────────────────────────────────────────────────────────
 * AI 요약 토글: AI_SUMMARIZE = True / False
-* DAYS_BACK: 최근 N 일 논문만 메일에 포함
 * GPT 모델 · API 키는 환경변수(OPENAI_API_KEY)로 관리
 """
 
@@ -41,7 +40,6 @@ if AI_SUMMARIZE:
 ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
 TOPIC_FILE = "topics.json"
 MAX_RESULTS_DEFAULT = 20
-DAYS_BACK = 1  # 최근 N 일
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
 
@@ -221,7 +219,7 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
             lines.append("・" * 30 + "\n")
     lines += [
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"지난 {DAYS_BACK}일 이내 제출된 논문만 포함했습니다.",
+        f"지난 24시간 이내 제출된 논문만 포함했습니다.",
     ]
     return "\n".join(lines)
 
