@@ -203,8 +203,6 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
             lines += [
                 f"{j}. 📄 {p['title']}",
                 f"   🔗 {p['link']}\n",
-                "   📝 Abstract:",
-                f"      {p['abstract']}\n",
             ]
 
             if AI_SUMMARIZE:
@@ -255,9 +253,7 @@ def main() -> None:
     first_topic, first_list = next(iter(papers.items()))
     subject = str(
         Header(
-            f"{date.today():%Y-%m-%d} - 오늘의 arXiv - "
-            f"{first_topic} ({len(first_list)})",
-            "utf-8",
+            f"{date.today():%Y-%m-%d} - 오늘의 arXiv - " "utf-8",
         )
     )
     send_email(subject, build_email(papers), sender, pwd, recipients)
