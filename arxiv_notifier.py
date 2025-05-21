@@ -252,7 +252,7 @@ def main() -> None:
     first_topic, first_list = next(iter(papers.items()))
     subject = str(
         Header(
-            f"{date.today():%Y-%m-%d} - 오늘의 arXiv - " "utf-8",
+            f"{date.today():%Y-%m-%d} - 오늘의 arXiv",
         )
     )
     send_email(subject, build_email(papers), sender, pwd, recipients)

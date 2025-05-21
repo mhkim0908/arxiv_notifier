@@ -2,82 +2,73 @@
     "NV Center": {
         "keywords": [
             "NV center",
-            "NV centers",
-            "nitrogen vacancy center",
             "nitrogen-vacancy center",
+            "nitrogen vacancy",
+            "NV centers",
             "diamond NV",
             "NV diamond",
             "NV ensemble",
-            "NV ensembles",
-            "pulsed ODMR",
-            "wide-field ODMR",
-            "NV magnetometry",
-            "ODMR spectroscopy",
-            "quantum sensing NV",
-            "quantum sensing with NV centers"
+            "diamond color center",
+            "quantum sensing with NV centers",
+            "NV magnetometry"
         ],
         "categories": [
             "quant-ph",
             "cond-mat.mes-hall",
+            "physics.optics",
             "physics.app-ph",
-            "physics.atom-ph",
-            "physics.bio-ph"
-        ],
-        "max_results": 75
+            "physics.atom-ph"
+        ]
     },
     "Holography": {
         "keywords": [
+            "holography",
             "digital holography",
             "computer generated holography",
-            "computer-generated holography",
             "CGH",
             "holographic display",
-            "holographic displays",
             "holographic microscopy",
-            "holographic tweezers",
-            "holographic optical tweezers",
-            "optical tweezers",
             "spatial light modulator",
             "SLM",
+            "holographic optical tweezers",
+            "holographic tweezers",
+            "optical trapping",
             "wavefront shaping",
-            "diffractive optics",
-            "phase retrieval",
-            "metaholography"
+            "diffractive optics"
         ],
         "categories": [
             "physics.optics",
             "physics.app-ph",
             "cs.CV",
-            "eess.IV",
+            "cs.GR",
             "quant-ph"
-        ],
-        "max_results": 100
+        ]
     },
     "Neutral Atom Quantum Computing": {
         "keywords": [
             "neutral atom quantum computing",
-            "neutral-atom quantum computing",
-            "neutral atom quantum computer",
+            "neutral atom quantum information",
+            "neutral atom quantum processor",
             "neutral atom qubit",
+            "rydberg atom",
+            "rydberg qubit",
             "rydberg atom array",
-            "rydberg atom arrays",
-            "rydberg quantum computing",
-            "rydberg quantum computer",
-            "rydberg blockade",
-            "neutral atom quantum gate",
-            "rydberg gate",
             "atomic array",
+            "neutral atom quantum gate",
+            "rydberg blockade",
+            "optical tweezers for atoms",
             "atom rearrangement",
-            "gray molasses cooling",
-            "magic tweezer",
-            "ground-state cooling neutral atom"
+            "atom trapping",
+            "non-destructive measurement",
+            "non-destructive readout",
+            "quantum software",
+            "quantum control"
         ],
         "categories": [
             "quant-ph",
             "physics.atom-ph",
             "physics.app-ph",
             "cs.QC"
-        ],
-        "max_results": 100
+        ]
     }
 }
