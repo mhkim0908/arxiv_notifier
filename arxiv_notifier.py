@@ -130,10 +130,19 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
     for topic, cfg in topics.items():
         papers = []
         for kw in cfg.get("keywords", []):
+            print(f"[DEBUG] Topic: {topic}, Keyword: {kw}")
             for e in fetch_entries(
                 make_query(kw, cfg.get("categories", [])),
                 int(cfg.get("max_results", MAX_RESULTS_DEFAULT)),
             ):
+                entry_dt = _get_entry_datetime(e)
+                now_utc = datetime.now(tz=timezone.utc)
+                cutoff_dt = now_utc - timedelta(days=DAYS_BACK)
+                print(f"[DEBUG] Paper: {e.title[:60]}...")
+                print(f"[DEBUG]   Published/Updated: {entry_dt}")
+                print(f"[DEBUG]   Current UTC: {now_utc}")
+                print(f"[DEBUG]   Cutoff Date (>=): {cutoff_dt}")
+                print(f"[DEBUG]   Is Recent? {is_recent(e)}")
                 if not is_recent(e):
                     continue
                 uid = hashlib.sha1(e.id.encode()).hexdigest()
