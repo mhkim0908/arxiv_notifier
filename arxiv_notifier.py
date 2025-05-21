@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import smtplib
+import time
 from urllib.parse import quote_plus
 from datetime import date, datetime, timedelta, timezone
 from email.header import Header
@@ -26,15 +27,19 @@ import feedparser
 AI_SUMMARIZE = True  # ← 켜거나 끔
 MODEL_ID = "gpt-4.1"
 if AI_SUMMARIZE:
-    import openai
+    try:
+        import openai
 
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+    except ImportError:
+        print("[Error] The 'openai' module is not installed.")
+        AI_SUMMARIZE = False
 
 # ─────────────── 기본 설정 ────────────────
 ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
 TOPIC_FILE = "topics.json"
 MAX_RESULTS_DEFAULT = 20
-DAYS_BACK = 3  # 최근 N 일
+DAYS_BACK = 1  # 최근 N 일
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
 
@@ -81,13 +86,21 @@ def fetch_entries(q: str, n: int) -> List[Any]:
 
 
 def _get_entry_datetime(entry) -> Optional[datetime]:
-    for field in ("published", "updated", "created"):
-        val = getattr(entry, field, None)
-        if not val:
-            continue
-        tup = eut.parsedate_tz(val)
-        if tup:
-            return datetime.fromtimestamp(eut.mktime_tz(tup), tz=timezone.utc)
+
+    for field in ("published_parsed", "updated_parsed", "created_parsed"):
+        tup = getattr(entry, field, None)
+        if tup:  # struct_time → epoch → datetime
+            return datetime.fromtimestamp(time.mktime(tup), tz=timezone.utc)
+        else:
+            print(f"[warn] {field} is None")
+    # for field in ("published", "updated", "created"):
+    #     val = getattr(entry, field, None)
+    #     if not val:
+    #         continue
+    #     tup = eut.parsedate_tz(val)
+    #     if tup:
+    #         return datetime.fromtimestamp(eut.mktime_tz(tup), tz=timezone.utc)
+
     return None
 
 
@@ -130,19 +143,10 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
     for topic, cfg in topics.items():
         papers = []
         for kw in cfg.get("keywords", []):
-            print(f"[DEBUG] Topic: {topic}, Keyword: {kw}")
             for e in fetch_entries(
                 make_query(kw, cfg.get("categories", [])),
                 int(cfg.get("max_results", MAX_RESULTS_DEFAULT)),
             ):
-                entry_dt = _get_entry_datetime(e)
-                now_utc = datetime.now(tz=timezone.utc)
-                cutoff_dt = now_utc - timedelta(days=DAYS_BACK)
-                print(f"[DEBUG] Paper: {e.title[:60]}...")
-                print(f"[DEBUG]   Published/Updated: {entry_dt}")
-                print(f"[DEBUG]   Current UTC: {now_utc}")
-                print(f"[DEBUG]   Cutoff Date (>=): {cutoff_dt}")
-                print(f"[DEBUG]   Is Recent? {is_recent(e)}")
                 if not is_recent(e):
                     continue
                 uid = hashlib.sha1(e.id.encode()).hexdigest()
