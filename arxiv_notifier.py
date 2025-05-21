@@ -8,7 +8,6 @@ arxiv_notifier.py
 
 from __future__ import annotations
 
-import email.utils as eut
 import hashlib
 import json
 import os
