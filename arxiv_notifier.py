@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional
 
 import feedparser
 
+KST = timezone(timedelta(hours=9), "KST")
+
 # ─────────────── AI 요약 설정 ───────────────
 AI_SUMMARIZE = True  # ← 켜거나 끔
 MODEL_ID = "gpt-4.1"
@@ -42,6 +44,22 @@ MAX_RESULTS_DEFAULT = 20
 DAYS_BACK = 1  # 최근 N 일
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
+
+
+def _get_window():
+    """arXiv 일일 발표 시각(09:00 KST)에 맞춘 24 h 구간을 반환"""
+    now_kst = datetime.now(KST)
+
+    today_9 = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now_kst < today_9:  # 09:00 이전에 실행되면 기준일을 하루 전으로
+        today_9 -= timedelta(days=1)
+
+    window_end = today_9  # 오늘 09:00 KST
+    window_start = today_9 - timedelta(days=1)  # 전날 09:00 KST
+    return window_start, window_end
+
+
+WINDOW_START, WINDOW_END = _get_window()
 
 
 # ────────────── 유틸 함수 ────────────────
@@ -105,10 +123,11 @@ def _get_entry_datetime(entry) -> Optional[datetime]:
 
 
 def is_recent(entry) -> bool:
-    dt = _get_entry_datetime(entry)
-    if dt is None:
+    dt_utc = _get_entry_datetime(entry)  # UTC datetime
+    if dt_utc is None:
         return False
-    return dt >= datetime.now(tz=timezone.utc) - timedelta(days=DAYS_BACK)
+    dt_kst = dt_utc.astimezone(KST)
+    return WINDOW_START <= dt_kst < WINDOW_END
 
 
 def truncate(txt: str, limit: int) -> str:
