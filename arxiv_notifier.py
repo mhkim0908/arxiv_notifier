@@ -182,17 +182,20 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
     for i, (topic, plist) in enumerate(papers.items()):
         lines += [f"📌 {topic.upper()} ({len(plist)})", "=" * (len(topic) + 7)]
         for j, p in enumerate(plist, 1):
-            if AI_SUMMARIZE:
-                lines.append("   💡 3-line summary(GPT-4.1):")
-                for ln in p["summary"].splitlines():
-                    lines.append(f"      {ln}")
-                lines.append("")
+
             lines += [
                 f"{j}. 📄 {p['title']}",
                 f"   🔗 {p['link']}\n",
                 "   📝 Abstract:",
                 f"      {p['abstract']}\n",
             ]
+
+            if AI_SUMMARIZE:
+                lines.append("   💡 3-line summary(GPT-4.1):")
+                for ln in p["summary"].splitlines():
+                    lines.append(f"      {ln}")
+                lines.append("")
+
             if j < len(plist):
                 lines.append("   " + "-" * 40 + "\n")
         if i < len(papers) - 1:
