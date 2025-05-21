@@ -34,7 +34,7 @@ if AI_SUMMARIZE:
 ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
 TOPIC_FILE = "topics.json"
 MAX_RESULTS_DEFAULT = 20
-DAYS_BACK = 1  # 최근 N 일
+DAYS_BACK = 3  # 최근 N 일
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
 
