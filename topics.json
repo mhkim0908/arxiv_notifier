@@ -9,7 +9,6 @@
         ],
         "categories": [
             "quant-ph",
-            "quant-comp",
             "physics.app-ph",
             "physics.atom-ph",
             "physics.optics"
@@ -29,11 +28,10 @@
         ],
         "categories": [
             "quant-ph",
-            "cs.quant-ph",
-            "quant-comp",
             "physics.optics",
             "physics.app-ph",
-            "physics.atom-ph"
+            "physics.atom-ph",
+            "cs.QC"
         ]
     },
     "Neutral Atom Quantum Computing": {
@@ -43,10 +41,10 @@
             "neutral atom*",
             "neutral-atom*",
             "neutral atom qubit*",
-            "neutral rydberg atom",
-            "rydberg atom",
+            "neutral rydberg atom*",
+            "rydberg atom*",
             "rydberg atom array*",
-            "neutral atom quantum gate",
+            "neutral atom quantum gate*",
             "rydberg quantum comput*",
             "atomic qubit array*",
             "atom rearrange*"
@@ -54,7 +52,8 @@
         "categories": [
             "quant-ph",
             "physics.app-ph",
-            "physics.atom-ph"
+            "physics.atom-ph",
+            "cs.QC"
         ]
     }
 }

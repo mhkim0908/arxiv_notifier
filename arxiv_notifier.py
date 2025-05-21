@@ -24,7 +24,7 @@ import feedparser
 
 # ─────────────── AI 요약 설정 ───────────────
 AI_SUMMARIZE = True  # ← 켜거나 끔
-MODEL_ID = "gpt-4.5-preview"
+MODEL_ID = "gpt-4.1"
 if AI_SUMMARIZE:
     import openai
 
@@ -170,7 +170,7 @@ def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
         lines += [f"📌 {topic.upper()} ({len(plist)})", "=" * (len(topic) + 7)]
         for j, p in enumerate(plist, 1):
             if AI_SUMMARIZE:
-                lines.append("   💡 3-line summary:")
+                lines.append("   💡 3-line summary(GPT-4.1):")
                 for ln in p["summary"].splitlines():
                     lines.append(f"      {ln}")
                 lines.append("")
