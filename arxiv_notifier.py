@@ -172,6 +172,12 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
 
                 title = " ".join(e.title.split())
                 abstract = " ".join(e.summary.split())
+                authors = (
+                    ", ".join(a.name for a in e.authors)
+                    if hasattr(e, "authors")
+                    else ""
+                )
+                cats = [t.term for t in getattr(e, "tags", [])]
                 if any(k in abstract.lower() for k in GLOBAL_EXCLUDE):
                     continue
 
@@ -179,6 +185,8 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                     "title": truncate(title, TITLE_MAX),
                     "link": e.link,
                     "abstract": truncate(abstract, ABSTRACT_MAX),
+                    "authors": authors,
+                    "categories": cats,
                 }
                 if AI_SUMMARIZE:
                     try:
@@ -195,28 +203,38 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
 # ─────────────── 메일 본문 ───────────────
 def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
     lines = ["📰  오늘의 arXiv\n"]
-    for i, (topic, plist) in enumerate(papers.items()):
+
+    for t_idx, (topic, plist) in enumerate(papers.items()):
         lines += [f"📌 {topic.upper()} ({len(plist)})", "=" * (len(topic) + 7)]
-        for j, p in enumerate(plist, 1):
 
-            lines += [
-                f"{j}. 📄 {p['title']}",
-                f"   🔗 {p['link']}\n",
-            ]
+        for p_idx, p in enumerate(plist, 1):
+            # ① 제목 + 링크 + [카테고리]
+            cat = ", ".join(p["categories"])
+            lines.append(f"{p_idx}. 📄 {p['title']}  ({cat})")
+            lines.append(f"      🔗 {p['link']}")
 
+            # ② 저자
+            authors = p.get("authors", "Unknown authors")
+            lines.append(f"      👥 {authors}")
+
+            # ③ GPT 세 줄 요약
             if AI_SUMMARIZE:
-                lines.append("   💡 3-line summary(GPT-4.1):")
+                lines.append("      💡 3-line summary:")
                 for ln in p["summary"].splitlines():
-                    lines.append(f"      {ln}")
-                lines.append("")
+                    lines.append(f"         {ln}")
+            else:
+                lines.append("      (요약 비활성화)")
 
-            if j < len(plist):
-                lines.append("   " + "-" * 40 + "\n")
-        if i < len(papers) - 1:
-            lines.append("・" * 30 + "\n")
+            # 카드 구분선
+            if p_idx < len(plist):
+                lines.append("      " + "-" * 40)
+
+        if t_idx < len(papers) - 1:
+            lines.append("・" * 30)
+
     lines += [
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"지난 24시간 이내 제출된 논문만 포함했습니다.",
+        "전날 09:00–오늘 09:00(KST) 제출 논문만 포함했습니다.",
     ]
     return "\n".join(lines)
 
