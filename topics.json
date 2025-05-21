@@ -1,58 +1,68 @@
 {
     "NV Center": {
         "keywords": [
-            "nv center*",
-            "nitrogen vacancy center*",
-            "nitrogen-vacancy center*",
-            "NV center ensemble",
-            "Diamond color center*"
+            "NV center",
+            "nitrogen-vacancy center",
+            "nitrogen vacancy",
+            "NV centers",
+            "diamond NV",
+            "NV diamond",
+            "NV ensemble",
+            "diamond color center",
+            "quantum sensing with NV centers",
+            "NV magnetometry"
         ],
         "categories": [
             "quant-ph",
+            "cond-mat.mes-hall",
+            "physics.optics",
             "physics.app-ph",
-            "physics.atom-ph",
-            "physics.optics"
+            "physics.atom-ph"
         ]
     },
     "Holography": {
         "keywords": [
+            "holography",
             "digital holography",
             "computer generated holography",
             "CGH",
-            "holography",
+            "holographic display",
+            "holographic microscopy",
             "spatial light modulator",
-            "focus array",
+            "SLM",
             "holographic optical tweezers",
             "holographic tweezers",
-            "holographic optical trapping"
+            "optical trapping",
+            "wavefront shaping",
+            "diffractive optics"
         ],
         "categories": [
-            "quant-ph",
             "physics.optics",
             "physics.app-ph",
-            "physics.atom-ph",
-            "cs.QC"
+            "cs.CV",
+            "cs.GR",
+            "quant-ph"
         ]
     },
     "Neutral Atom Quantum Computing": {
         "keywords": [
-            "neutral atom quantum comput*",
-            "neutral-atom quantum process*",
-            "neutral atom*",
-            "neutral-atom*",
-            "neutral atom qubit*",
-            "neutral rydberg atom*",
-            "rydberg atom*",
-            "rydberg atom array*",
-            "neutral atom quantum gate*",
-            "rydberg quantum comput*",
-            "atomic qubit array*",
-            "atom rearrange*"
+            "neutral atom quantum computing",
+            "neutral atom quantum information",
+            "neutral atom quantum processor",
+            "neutral atom qubit",
+            "rydberg atom",
+            "rydberg qubit",
+            "rydberg atom array",
+            "atomic array",
+            "neutral atom quantum gate",
+            "rydberg blockade",
+            "optical tweezers for atoms",
+            "atom rearrangement"
         ],
         "categories": [
             "quant-ph",
-            "physics.app-ph",
             "physics.atom-ph",
+            "physics.app-ph",
             "cs.QC"
         ]
     }
