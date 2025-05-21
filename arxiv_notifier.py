@@ -14,7 +14,7 @@ import hashlib
 import json
 import os
 import smtplib
-import urllib.parse
+from urllib.parse import quote_plus
 from datetime import date, datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
@@ -53,9 +53,18 @@ def load_topics(path: str) -> Dict[str, Any]:
 
 
 def make_query(keyword: str, cats: list[str]) -> str:
-    # neutral atom quantum gate → neutral AND atom AND quantum AND gate
-    terms = "+AND+".join(f"(ti:{w}+OR+abs:{w})" for w in keyword.split())
-    kw_part = f"({terms})"
+    """
+    * 다단어 키워드 → "문구 검색" (띄어쓰기 유지)
+    * 단일 단어일 때 자동으로 접미 * 추가 (이미 * 있으면 그대로)
+    """
+    if " " in keyword:
+        # "neutral atom" → "%22neutral+atom%22"
+        phrase = quote_plus(keyword, safe="")  # URL-encode
+        kw_part = f"(ti:%22{phrase}%22+OR+abs:%22{phrase}%22)"
+    else:
+        token = keyword if "*" in keyword else f"{keyword}*"
+        kw_part = f"(ti:{token}+OR+abs:{token})"
+
     if cats:
         cat_part = "+OR+".join(f"cat:{c}" for c in cats)
         return f"({cat_part})+AND+{kw_part}"

@@ -1,11 +1,11 @@
 {
     "NV Center": {
         "keywords": [
-            "nv center",
-            "nitrogen vacancy center",
-            "nitrogen-vacancy center",
+            "nv center*",
+            "nitrogen vacancy center*",
+            "nitrogen-vacancy center*",
             "NV center ensemble",
-            "Diamond color centers"
+            "Diamond color center*"
         ],
         "categories": [
             "quant-ph",
@@ -38,22 +38,18 @@
     },
     "Neutral Atom Quantum Computing": {
         "keywords": [
-            "neutral atom quantum computing",
-            "neutral-atom quantum computing",
-            "neutral atom quantum computer",
-            "neutral-atom quantum processor",
-            "neutral atoms",
-            "neutral atom",
-            "neutral-atom",
-            "neutral atom qubit",
-            "neutral atom qubits",
-            "rydberg quantum computing",
-            "rydberg atom array",
-            "neutral atom quantum gate",
-            "atomic qubit array",
+            "neutral atom quantum comput*",
+            "neutral-atom quantum process*",
+            "neutral atom*",
+            "neutral-atom*",
+            "neutral atom qubit*",
             "neutral rydberg atom",
             "rydberg atom",
-            "atom rearrangement"
+            "rydberg atom array*",
+            "neutral atom quantum gate",
+            "rydberg quantum comput*",
+            "atomic qubit array*",
+            "atom rearrange*"
         ],
         "categories": [
             "quant-ph",
