@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 import feedparser
 
-KST = timezone(timedelta(hours=9), "KST")
+YESTERDAY_UTC = (datetime.now(timezone.utc) - timedelta(days=1)).date()
 
 # ─────────────── AI 요약 설정 ───────────────
 AI_SUMMARIZE = True  # ← 켜거나 끔
@@ -123,8 +123,7 @@ def is_recent(entry) -> bool:
     dt_utc = _get_entry_datetime(entry)  # UTC datetime
     if dt_utc is None:
         return False
-    dt_kst = dt_utc.astimezone(KST)
-    return WINDOW_START <= dt_kst < WINDOW_END
+    return dt_utc.date() == YESTERDAY_UTC  # ← 날짜만 비교
 
 
 def truncate(txt: str, limit: int) -> str:
