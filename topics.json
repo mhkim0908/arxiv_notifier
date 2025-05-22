@@ -25,16 +25,21 @@
             "holography",
             "digital holography",
             "computer generated holography",
+            "computer-generated holography",
             "CGH",
             "holographic display",
             "holographic microscopy",
             "spatial light modulator",
             "SLM",
+            "optimal hologram",
             "holographic optical tweezers",
             "holographic tweezers",
             "optical trapping",
             "wavefront shaping",
-            "diffractive optics"
+            "phase-only hologram",
+            "phase hologram",
+            "diffractive optics",
+            "IFTA"
         ],
         "categories": [
             "physics.optics",
@@ -59,10 +64,12 @@
             "optical tweezers for atoms",
             "atom rearrangement",
             "atom trapping",
+            "atom traps",
             "non-destructive measurement",
             "non-destructive readout",
             "quantum software",
-            "quantum control"
+            "quantum control",
+            "programmable quantum simulator"
         ],
         "categories": [
             "quant-ph",
