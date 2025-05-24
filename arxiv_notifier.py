@@ -36,6 +36,7 @@ ABSTRACT_MAX = 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
 
 KST = timezone(timedelta(hours=9))
+WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "1"))
 API_RATE_SEC = 3  # arXiv ToS: ≤ 1 request / 3 s
 # ──────────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ def in_kst_window(entry) -> bool:
     today_09 = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
     if now_kst < today_09:  # Executed before 09:00 → shift window back one day
         today_09 -= timedelta(days=1)
-    start = today_09 - timedelta(days=1)
+    start = today_09 - timedelta(days=WINDOW_DAYS)
 
     return start <= dt_kst < today_09
 

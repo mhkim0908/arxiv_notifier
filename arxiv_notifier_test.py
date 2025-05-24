@@ -5,7 +5,7 @@ Fetch→filter→summarize→construct e-mail, but never send SMTP.
 """
 
 from __future__ import annotations
-import json, pathlib, sys
+import json, pathlib, sys, os
 from arxiv_notifier import (
     load_topics,
     make_query,
@@ -68,7 +68,7 @@ def main() -> None:
     (ARTIFACT_DIR / "email.txt").write_text(build_email(papers))
 
     # 2) console summary
-    print(f"\n=== Stats (09:00 KST window) ===")
+    print(f"=== Stats (last {os.getenv('WINDOW_DAYS', 1)} day(s)) ===")
     print(f"TOTAL fetched : {stats['total']}")
     print(f"TOTAL kept    : {stats['kept']}")
     for t, s in stats["per_topic"].items():
