@@ -42,3 +42,8 @@ jobs:
           echo '```'                     >> $GITHUB_STEP_SUMMARY
           cat artifacts/email.txt        >> $GITHUB_STEP_SUMMARY
           echo '```'                     >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat digest.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '---' >> $GITHUB_STEP_SUMMARY
+

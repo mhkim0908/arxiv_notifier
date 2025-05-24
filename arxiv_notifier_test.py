@@ -1,42 +1,82 @@
 #!/usr/bin/env python3
 """
-arxiv_notifier_test.py
-Run the full arXiv → filter → GPT-summary → e-mail pipeline
-without touching SMTP.  Designed for CI / GitHub Actions.
+arxiv_notifier_test.py – dry-run for CI / local debugging
+Fetch→filter→summarize→construct e-mail, but never send SMTP.
 """
+
 from __future__ import annotations
-import json
-import pathlib
-import sys
+import json, pathlib, sys
 from arxiv_notifier import (
     load_topics,
-    collect_papers,
+    make_query,
+    fetch_entries,
+    in_kst_window,
+    GLOBAL_EXCLUDE,
+    truncate,
+    summarize,
     build_email,
-    summarize,  # re-exports openai-based summarizer
+    KST,
+    MAX_RESULTS_DEFAULT,
 )
 
 TOPIC_FILE = "topics.json"
 ARTIFACT_DIR = pathlib.Path("artifacts")
 ARTIFACT_DIR.mkdir(exist_ok=True)
 
+### NEW:  counters
+stats = {"total": 0, "kept": 0, "per_topic": {}}
+
+
+def collect_with_stats(topics):
+    """clone of collect_papers(), but records totals"""
+    out, seen = {}, set()
+
+    for topic, cfg in topics.items():
+        kept_here, total_here = 0, 0
+        for kw in cfg["keywords"]:
+            entries = fetch_entries(
+                make_query(kw, cfg["categories"]),
+                int(cfg.get("max_results", MAX_RESULTS_DEFAULT)),
+            )
+            total_here += len(entries)
+            for e in entries:
+                if not in_kst_window(e):
+                    continue
+                if any(x in e.summary.lower() for x in GLOBAL_EXCLUDE):
+                    continue
+                uid = e.id
+                if uid in seen:
+                    continue
+                seen.add(uid)
+                kept_here += 1
+                out.setdefault(topic, []).append(
+                    {"title": truncate(e.title, 120), "link": e.link}
+                )
+        ### NEW:  accumulate per-topic
+        stats["per_topic"][topic] = {"total": total_here, "kept": kept_here}
+        stats["total"] += total_here
+        stats["kept"] += kept_here
+    return out
+
 
 def main() -> None:
     topics = load_topics(TOPIC_FILE)
+    papers = collect_with_stats(topics)
 
-    # 1) fetch + filter
-    papers = collect_papers(topics)
+    # 1) artefacts
+    (ARTIFACT_DIR / "papers.json").write_text(json.dumps(papers, indent=2))
+    (ARTIFACT_DIR / "email.txt").write_text(build_email(papers))
 
-    # 2) dump raw structure for later inspection
-    (ARTIFACT_DIR / "papers.json").write_text(
-        json.dumps(papers, indent=2, ensure_ascii=False)
-    )
+    # 2) console summary
+    print(f"\n=== Stats (09:00 KST window) ===")
+    print(f"TOTAL fetched : {stats['total']}")
+    print(f"TOTAL kept    : {stats['kept']}")
+    for t, s in stats["per_topic"].items():
+        print(f"  • {t:25s} {s['kept']:3d} / {s['total']}")
+    print("================================\n")
 
-    # 3) build the final e-mail body
-    body = build_email(papers)
-    (ARTIFACT_DIR / "email.txt").write_text(body)
-
-    # 4) also print to stdout (Actions → step log / $GITHUB_STEP_SUMMARY)
-    print(body)
+    # 3) print the email body
+    print((ARTIFACT_DIR / "email.txt").read_text())
 
 
 if __name__ == "__main__":
