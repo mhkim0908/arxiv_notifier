@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 arxiv_notifier.py
-────────────────────────────────────────────────────────────
-* AI 요약 토글: AI_SUMMARIZE = True / False
-* GPT 모델 · API 키는 환경변수(OPENAI_API_KEY)로 관리
+
+Daily arXiv digest (09:00 KST window).
+* Optional 3‑line GPT summary (toggle AI_SUMMARIZE)
+* SMTP credentials and recipient list via environment variables
 """
 
 from __future__ import annotations
@@ -13,43 +14,49 @@ import json
 import os
 import smtplib
 import time
-from urllib.parse import quote_plus
 from datetime import date, datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote_plus
 
 import feedparser
 
-YESTERDAY_UTC = (datetime.now(timezone.utc) - timedelta(days=1)).date()
-
-# ─────────────── AI 요약 설정 ───────────────
-AI_SUMMARIZE = True  # ← 켜거나 끔
+# ───────────────────── configuration ─────────────────────
+AI_SUMMARIZE = True  # Toggle GPT‑based summarization
 MODEL_ID = "gpt-4.1"
+
+ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
+TOPIC_FILE = "topics.json"
+
+MAX_RESULTS_DEFAULT = 20
+TITLE_MAX = 120
+ABSTRACT_MAX = 600
+
+GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
+
+KST = timezone(timedelta(hours=9))
+API_RATE_SEC = 3  # arXiv ToS: ≤ 1 request / 3 s
+# ──────────────────────────────────────────────────────────
+
 if AI_SUMMARIZE:
     try:
         import openai
 
         openai.api_key = os.getenv("OPENAI_API_KEY")
     except ImportError:
-        print("[Error] The 'openai' module is not installed.")
+        print("[warn] openai package not installed, disabling summaries")
         AI_SUMMARIZE = False
 
-# ─────────────── 기본 설정 ────────────────
-ENV_VARS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "TO_EMAIL")
-TOPIC_FILE = "topics.json"
-MAX_RESULTS_DEFAULT = 20
-TITLE_MAX, ABSTRACT_MAX = 120, 600
-GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
-KST = timezone(timedelta(hours=9))
+
+# ───────────────────── helper functions ───────────────────
 
 
-# ────────────── 유틸 함수 ────────────────
 def getenv_or_exit(name: str) -> str:
-    v = os.getenv(name)
-    if not v:
-        raise SystemExit(f"[config] '{name}' 환경변수가 없습니다")
-    return v
+    value = os.getenv(name)
+    if not value:
+        raise SystemExit(f"Missing env var: {name}")
+    return value
 
 
 def load_topics(path: str) -> Dict[str, Any]:
@@ -58,13 +65,9 @@ def load_topics(path: str) -> Dict[str, Any]:
 
 
 def make_query(keyword: str, cats: list[str]) -> str:
-    """
-    * 다단어 키워드 → "문구 검색" (띄어쓰기 유지)
-    * 단일 단어일 때 자동으로 접미 * 추가 (이미 * 있으면 그대로)
-    """
+    """Build an arXiv API query string."""
     if " " in keyword:
-        # "neutral atom" → "%22neutral+atom%22"
-        phrase = quote_plus(keyword, safe="")  # URL-encode
+        phrase = quote_plus(keyword, safe="")
         kw_part = f"(ti:%22{phrase}%22+OR+abs:%22{phrase}%22)"
     else:
         token = keyword if "*" in keyword else f"{keyword}*"
@@ -78,56 +81,42 @@ def make_query(keyword: str, cats: list[str]) -> str:
 
 def fetch_entries(q: str, n: int) -> List[Any]:
     url = (
-        "http://export.arxiv.org/api/query?search_query="
-        f"{q}&start=0&max_results={n}"
+        "http://export.arxiv.org/api/query?"
+        f"search_query={q}&start=0&max_results={n}"
         "&sortBy=submittedDate&sortOrder=descending"
     )
-    return feedparser.parse(url).entries
+    feed = feedparser.parse(url)
+    time.sleep(API_RATE_SEC)  # Respect arXiv rate limit
+    return feed.entries
 
 
-def _get_entry_datetime(entry) -> Optional[datetime]:
-
-    for field in ("published_parsed", "updated_parsed", "created_parsed"):
+def _entry_datetime(entry) -> Optional[datetime]:
+    """Return the most recently available timestamp for an entry (UTC)."""
+    for field in ("updated_parsed", "published_parsed", "created_parsed"):
         tup = getattr(entry, field, None)
-        if tup:  # struct_time → epoch → datetime
+        if tup:
             return datetime.fromtimestamp(time.mktime(tup), tz=timezone.utc)
-        else:
-            print(f"[warn] {field} is None")
-    # for field in ("published", "updated", "created"):
-    #     val = getattr(entry, field, None)
-    #     if not val:
-    #         continue
-    #     tup = eut.parsedate_tz(val)
-    #     if tup:
-    #         return datetime.fromtimestamp(eut.mktime_tz(tup), tz=timezone.utc)
-
     return None
 
 
-def is_recent(entry) -> bool:
-    dt_utc = _get_entry_datetime(entry)  # UTC datetime
+def in_kst_window(entry) -> bool:
+    """Keep papers submitted between yesterday 09:00 and today 09:00 KST."""
+    dt_utc = _entry_datetime(entry)
     if dt_utc is None:
         return False
-    return dt_utc.date() == YESTERDAY_UTC  # ← 날짜만 비교
-
-
-def is_in_daily_window(entry) -> bool:
-    dt_utc = _get_entry_datetime(entry)
-    if dt_utc is None:
-        return False
+    dt_kst = dt_utc.astimezone(KST)
 
     now_kst = datetime.now(tz=KST)
-    today9 = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
-    if now_kst < today9:  # 자정~09시 사이 실행될 때
-        today9 -= timedelta(days=1)
+    today_09 = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now_kst < today_09:  # Executed before 09:00 → shift window back one day
+        today_09 -= timedelta(days=1)
+    start = today_09 - timedelta(days=1)
 
-    start = today9 - timedelta(days=1)  # 전날 09시
-    dt_kst = dt_utc.astimezone(KST)
-    return start <= dt_kst < today9
+    return start <= dt_kst < today_09
 
 
-def truncate(txt: str, limit: int) -> str:
-    return txt if len(txt) <= limit else txt[: limit - 3].rstrip() + "..."
+def truncate(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
 
 
 def summarize(title: str, abstract: str) -> str:
@@ -137,11 +126,11 @@ def summarize(title: str, abstract: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are a scientific summarizer.\n"
+                    "You are a scientific summarizer. "
                     "Return exactly three lines:\n"
-                    "1) Problem: <one concise sentence>\n"
-                    "2) Result: <one concise sentence>\n"
-                    "3) Method: <one concise sentence>"
+                    "1) Problem: <one sentence>\n"
+                    "2) Result: <one sentence>\n"
+                    "3) Method: <one sentence>"
                 ),
             },
             {"role": "user", "content": f"TITLE: {title}\nTEXT: {abstract}"},
@@ -152,99 +141,87 @@ def summarize(title: str, abstract: str) -> str:
     return resp.choices[0].message.content.strip()
 
 
-# ────────────── 논문 수집 ───────────────
+# ───────────────────────── core ───────────────────────────
+
+
 def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
-    out, seen = {}, set()
+    output: Dict[str, List[Dict[str, str]]] = {}
+    seen: set[str] = set()
+
     for topic, cfg in topics.items():
-        papers = []
+        papers: List[Dict[str, str]] = []
         for kw in cfg.get("keywords", []):
-            for e in fetch_entries(
+            for entry in fetch_entries(
                 make_query(kw, cfg.get("categories", [])),
                 int(cfg.get("max_results", MAX_RESULTS_DEFAULT)),
             ):
-                if not is_in_daily_window(e):
+                if not in_kst_window(entry):
                     continue
-                uid = hashlib.sha1(e.id.encode()).hexdigest()
+
+                uid = hashlib.sha1(entry.id.encode()).hexdigest()
                 if uid in seen:
                     continue
                 seen.add(uid)
 
-                title = " ".join(e.title.split())
-                abstract = " ".join(e.summary.split())
-                authors = (
-                    ", ".join(a.name for a in e.authors)
-                    if hasattr(e, "authors")
-                    else ""
-                )
-                cats = [t.term for t in getattr(e, "tags", [])]
-                if any(k in abstract.lower() for k in GLOBAL_EXCLUDE):
+                title = " ".join(entry.title.split())
+                abstract = " ".join(entry.summary.split())
+                if any(excl in abstract.lower() for excl in GLOBAL_EXCLUDE):
                     continue
 
                 info = {
                     "title": truncate(title, TITLE_MAX),
-                    "link": e.link,
+                    "link": entry.link,
                     "abstract": truncate(abstract, ABSTRACT_MAX),
-                    "authors": authors,
-                    "categories": cats,
+                    "authors": ", ".join(a.name for a in getattr(entry, "authors", [])),
+                    "categories": [t.term for t in getattr(entry, "tags", [])],
                 }
+
                 if AI_SUMMARIZE:
                     try:
                         info["summary"] = summarize(title, abstract)
                     except Exception as err:
-                        info["summary"] = f"(요약 실패: {err})"
+                        info["summary"] = f"(summary error: {err})"
 
                 papers.append(info)
+
         if papers:
-            out[topic] = papers
-    return out
+            output[topic] = papers
+
+    return output
 
 
-# ─────────────── 메일 본문 ───────────────
 def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
-    lines = ["📰  오늘의 arXiv\n"]
+    lines: List[str] = ["📰  Daily arXiv Digest\n"]
 
     for t_idx, (topic, plist) in enumerate(papers.items()):
         lines += [f"📌 {topic.upper()} ({len(plist)})", "=" * (len(topic) + 7)]
 
         for p_idx, p in enumerate(plist, 1):
-            # ① 제목 + 링크 + [카테고리]
             cat = ", ".join(p["categories"])
             lines.append(f"{p_idx}. 📄 {p['title']}  ({cat})")
             lines.append(f"      🔗 {p['link']}")
+            lines.append(f"      👥 {p.get('authors', 'Unknown authors')}")
 
-            # ② 저자
-            authors = p.get("authors", "Unknown authors")
-            lines.append(f"      👥 {authors}")
-
-            # ③ GPT 세 줄 요약
             if AI_SUMMARIZE:
-                lines.append("      💡 3-line summary:")
+                lines.append("      💡 3‑line summary:")
                 for ln in p["summary"].splitlines():
                     lines.append(f"         {ln}")
-            else:
-                lines.append("      (요약 비활성화)")
 
-            # 카드 구분선
             if p_idx < len(plist):
                 lines.append("      " + "-" * 40)
 
         if t_idx < len(papers) - 1:
-            lines.append("・" * 30)
+            lines.append("-" * 30)
 
     lines += [
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "전날 09:00–오늘 09:00(KST) 제출 논문만 포함했습니다.",
+        "Window: yesterday 09:00 – today 09:00 KST",
     ]
     return "\n".join(lines)
 
 
-# ─────────────── 이메일 발송 ───────────────
 def send_email(
-    subject: str,
-    body: str,
-    sender: str,
-    pwd: str,
-    recipients: list[str],
+    subject: str, body: str, sender: str, pwd: str, recipients: list[str]
 ) -> None:
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"], msg["From"] = subject, sender
@@ -256,7 +233,6 @@ def send_email(
         s.sendmail(sender, recipients, msg.as_string())
 
 
-# ─────────────────── 메인 ───────────────────
 def main() -> None:
     sender, pwd, rcpt_raw = (getenv_or_exit(k) for k in ENV_VARS)
     recipients = [e.strip() for e in rcpt_raw.split(",") if e.strip()]
@@ -266,12 +242,7 @@ def main() -> None:
         print("[info] no new papers")
         return
 
-    first_topic, first_list = next(iter(papers.items()))
-    subject = str(
-        Header(
-            f"{date.today():%Y-%m-%d} - 오늘의 arXiv",
-        )
-    )
+    subject = str(Header(f"{date.today():%Y-%m-%d} – arXiv Digest"))
     send_email(subject, build_email(papers), sender, pwd, recipients)
     print("[ok] email sent")
 
