@@ -41,6 +41,7 @@ TOPIC_FILE = "topics.json"
 MAX_RESULTS_DEFAULT = 20
 TITLE_MAX, ABSTRACT_MAX = 120, 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
+KST = timezone(timedelta(hours=9))
 
 
 # ────────────── 유틸 함수 ────────────────
@@ -110,6 +111,21 @@ def is_recent(entry) -> bool:
     return dt_utc.date() == YESTERDAY_UTC  # ← 날짜만 비교
 
 
+def is_in_daily_window(entry) -> bool:
+    dt_utc = _get_entry_datetime(entry)
+    if dt_utc is None:
+        return False
+
+    now_kst = datetime.now(tz=KST)
+    today9 = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now_kst < today9:  # 자정~09시 사이 실행될 때
+        today9 -= timedelta(days=1)
+
+    start = today9 - timedelta(days=1)  # 전날 09시
+    dt_kst = dt_utc.astimezone(KST)
+    return start <= dt_kst < today9
+
+
 def truncate(txt: str, limit: int) -> str:
     return txt if len(txt) <= limit else txt[: limit - 3].rstrip() + "..."
 
@@ -146,7 +162,7 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                 make_query(kw, cfg.get("categories", [])),
                 int(cfg.get("max_results", MAX_RESULTS_DEFAULT)),
             ):
-                if not is_recent(e):
+                if not is_in_daily_window(e):
                     continue
                 uid = hashlib.sha1(e.id.encode()).hexdigest()
                 if uid in seen:
