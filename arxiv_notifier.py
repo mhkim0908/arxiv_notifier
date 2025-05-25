@@ -29,6 +29,9 @@ KST = timezone(timedelta(hours=9))
 WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "1"))  # Default to 1 day for 24-hour window
 API_RATE_SEC = 3
 
+# NEW: Stats tracking
+stats = {"total": 0, "kept": 0, "per_topic": {}}
+
 if AI_SUMMARIZE:
     try:
         import openai
@@ -184,6 +187,9 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
         papers = []
         keywords = config.get("keywords", [])
 
+        # NEW: Initialize per-topic stats
+        topic_total, topic_kept = 0, 0
+
         # Process each keyword separately to get more comprehensive results
         for keyword in keywords:
             try:
@@ -191,6 +197,7 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                 max_results = int(config.get("max_results", MAX_RESULTS_DEFAULT))
 
                 entries = fetch_entries(query, max_results)
+                topic_total += len(entries)  # NEW: Count fetched
 
                 for entry in entries:
                     # Time window filter first (most selective)
@@ -223,6 +230,9 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                     ):
                         continue
 
+                    # NEW: Count kept papers
+                    topic_kept += 1
+
                     # Build paper info
                     authors_list = getattr(entry, "authors", [])
                     authors_str = ", ".join(
@@ -252,12 +262,27 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                 print(f"Error processing keyword '{keyword}': {e}")
                 continue
 
+        # NEW: Update global stats
+        stats["per_topic"][topic] = {"total": topic_total, "kept": topic_kept}
+        stats["total"] += topic_total
+        stats["kept"] += topic_kept
+
         if papers:
             # Sort by publication date (most recent first)
             papers.sort(key=lambda p: p.get("link", ""), reverse=True)
             output[topic] = papers
 
     return output
+
+
+def print_stats():
+    """Print collection statistics"""
+    print(f"=== Stats (last {WINDOW_DAYS} day(s)) ===")
+    print(f"TOTAL fetched : {stats['total']}")
+    print(f"TOTAL kept    : {stats['kept']}")
+    for t, s in stats["per_topic"].items():
+        print(f"  • {t:25s} {s['kept']:3d} / {s['total']}")
+    print("================================")
 
 
 def build_email(papers: Dict[str, List[Dict[str, str]]]) -> str:
@@ -322,11 +347,15 @@ def main() -> None:
         topics = load_topics(TOPIC_FILE)
         papers = collect_papers(topics)
 
+        print_stats()
+
         if not papers:
+            print("No papers found - skipping email")
             return
 
         subject = str(Header(f"{date.today():%Y-%m-%d} – arXiv Digest"))
         send_email(subject, build_email(papers), sender, pwd, recipients)
+        print("Email sent successfully!")
 
     except Exception as e:
         print(f"Error: {e}")
