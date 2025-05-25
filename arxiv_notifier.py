@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 import feedparser
 
@@ -66,8 +66,10 @@ def make_query(keyword: str, cats: list[str]) -> str:
     keyword = keyword.strip()
 
     if " " in keyword:
-        phrase = quote_plus(keyword, safe="")
-        kw_part = f"(ti:%22{phrase}%22+OR+abs:%22{phrase}%22)"
+        phrase = quote(keyword, safe="")
+
+        kw_part = f'(ti:"{phrase}" OR abs:"{phrase}")'
+
     else:
         token = keyword if "*" in keyword else f"{keyword}*"
         kw_part = f"(ti:{token}+OR+abs:{token})"
