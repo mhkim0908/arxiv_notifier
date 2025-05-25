@@ -6,11 +6,12 @@ Fetch→filter→summarize→construct e-mail, but never send SMTP.
 
 from __future__ import annotations
 import json, pathlib, sys, os
+import calendar
 from arxiv_notifier import (
     load_topics,
     make_query,
     fetch_entries,
-    in_kst_window,
+    is_in_time_window,
     GLOBAL_EXCLUDE,
     truncate,
     summarize,
@@ -40,7 +41,7 @@ def collect_with_stats(topics):
             )
             total_here += len(entries)
             for e in entries:
-                if not in_kst_window(e):
+                if not is_in_time_window(e):
                     continue
                 if any(x in e.summary.lower() for x in GLOBAL_EXCLUDE):
                     continue
@@ -50,7 +51,15 @@ def collect_with_stats(topics):
                 seen.add(uid)
                 kept_here += 1
                 out.setdefault(topic, []).append(
-                    {"title": truncate(e.title, 120), "link": e.link}
+                    {
+                        "title": truncate(e.title, 120),
+                        "link": e.link,
+                        "abstract": truncate(e.summary, 500),
+                        "authors": ", ".join(a.name for a in e.authors),
+                        "categories": [t.term for t in e.tags],
+                        "summary": summarize(e.title, e.summary) if e.summary else "",
+                        "date": e.published.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
                 )
         ### NEW:  accumulate per-topic
         stats["per_topic"][topic] = {"total": total_here, "kept": kept_here}

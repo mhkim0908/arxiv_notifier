@@ -3,6 +3,7 @@ import json
 import os
 import smtplib
 import time
+import calendar
 from datetime import date, datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
@@ -104,8 +105,9 @@ def _get_entry_timestamp(entry) -> Optional[datetime]:
         time_tuple = getattr(entry, field, None)
         if time_tuple:
             try:
-                # Convert to UTC datetime
-                timestamp = time.mktime(time_tuple)
+                # UTC 시간 튜플을 Unix 타임스탬프로 변환
+                timestamp = calendar.timegm(time_tuple)
+                # UTC 타임존의 datetime 객체로 변환
                 return datetime.fromtimestamp(timestamp, tz=timezone.utc)
             except (ValueError, OSError, OverflowError):
                 continue
