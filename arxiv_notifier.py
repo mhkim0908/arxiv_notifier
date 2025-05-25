@@ -66,16 +66,15 @@ def make_query(keyword: str, cats: list[str]) -> str:
     keyword = keyword.strip()
 
     if " " in keyword:
-        phrase = quote(keyword, safe="")
-        kw_part = f'(ti:"{phrase}" OR abs:"{phrase}")'
+        kw_part = f'(ti:"{keyword}" OR abs:"{keyword}")'
     else:
         token = keyword if "*" in keyword else f"{keyword}*"
-        kw_part = f"(ti:{token}+OR+abs:{token})"
+        kw_part = f"(ti:{token} OR abs:{token})"
 
     if cats:
-        cat_part = "+OR+".join(f"cat:{c}" for c in cats if c.strip())
+        cat_part = " OR ".join(f"cat:{c}" for c in cats if c.strip())
         if cat_part:
-            return f"({cat_part})+AND+{kw_part}"
+            return f"({cat_part}) AND {kw_part}"
 
     return kw_part
 
@@ -84,9 +83,11 @@ def fetch_entries(q: str, n: int) -> List[Any]:
     if n <= 0:
         raise ValueError("Invalid result count")
 
+    # URL encode the entire query string
+    encoded_query = quote(q, safe="")
     url = (
         "http://export.arxiv.org/api/query?"
-        f"search_query={q}&start=0&max_results={n}"
+        f"search_query={encoded_query}&start=0&max_results={n}"
         "&sortBy=submittedDate&sortOrder=descending"
     )
 
