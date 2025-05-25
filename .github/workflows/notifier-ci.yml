@@ -1,17 +1,23 @@
-# .github/workflows/arxiv-notifier.yml
 name: arXiv-notifier CI
 
 on:
   push:
     branches: [ main ]
   pull_request:
+  workflow_dispatch:  # 수동 실행 가능
+    inputs:
+      window_days:
+        description: 'Time window in days'
+        required: false
+        default: '1'
+        type: string
 
 jobs:
   dry-run:
     runs-on: ubuntu-latest
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      WINDOW_DAYS: 1
+      WINDOW_DAYS: ${{ github.event.inputs.window_days || '1' }}
 
     steps:
       - uses: actions/checkout@v4
