@@ -26,7 +26,7 @@ ABSTRACT_MAX = 600
 GLOBAL_EXCLUDE = {"review", "survey", "comment on", "corrigendum"}
 
 KST = timezone(timedelta(hours=9))
-WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "1"))
+WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "10"))
 API_RATE_SEC = 3
 
 if AI_SUMMARIZE:
