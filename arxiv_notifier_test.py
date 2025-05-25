@@ -6,6 +6,7 @@ Fetch→filter→summarize→construct e-mail, but never send SMTP.
 
 from __future__ import annotations
 import json, pathlib, sys, os
+from datetime import datetime
 
 ROOT = pathlib.Path(__file__).resolve().parent
 ARTIFACT_DIR = ROOT / "artifacts"
@@ -22,14 +23,26 @@ from arxiv_notifier import (
     build_email,
     KST,
     MAX_RESULTS_DEFAULT,
+    _get_entry_timestamp,  # Add this import
 )
 
 TOPIC_FILE = "topics.json"
 ARTIFACT_DIR = pathlib.Path("artifacts")
 ARTIFACT_DIR.mkdir(exist_ok=True)
 
-### NEW:  counters
+### NEW: counters
 stats = {"total": 0, "kept": 0, "per_topic": {}}
+
+
+def format_date(entry):
+    """Helper function to safely format date using the same logic as main module"""
+    dt = _get_entry_timestamp(entry)
+    if dt:
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        # Fallback: try to use published string directly
+        published = getattr(entry, "published", "Unknown date")
+        return published if isinstance(published, str) else str(published)
 
 
 def collect_with_stats(topics):
@@ -62,10 +75,12 @@ def collect_with_stats(topics):
                         "authors": ", ".join(a.name for a in e.authors),
                         "categories": [t.term for t in e.tags],
                         "summary": summarize(e.title, e.summary) if e.summary else "",
-                        "date": e.published.strftime("%Y-%m-%d %H:%M:%S"),
+                        "date": format_date(
+                            e
+                        ),  # Fixed: pass entire entry, not e.published
                     }
                 )
-        ### NEW:  accumulate per-topic
+        ### NEW: accumulate per-topic
         stats["per_topic"][topic] = {"total": total_here, "kept": kept_here}
         stats["total"] += total_here
         stats["kept"] += kept_here
