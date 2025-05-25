@@ -6,7 +6,11 @@ Fetch→filter→summarize→construct e-mail, but never send SMTP.
 
 from __future__ import annotations
 import json, pathlib, sys, os
-import calendar
+
+ROOT = pathlib.Path(__file__).resolve().parent
+ARTIFACT_DIR = ROOT / "artifacts"
+ARTIFACT_DIR.mkdir(exist_ok=True)
+
 from arxiv_notifier import (
     load_topics,
     make_query,
