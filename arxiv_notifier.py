@@ -65,16 +65,18 @@ def make_query(keyword: str, cats: list[str]) -> str:
 
     keyword = keyword.strip()
 
+    # For multi-word phrases, use exact match with quotes
     if " " in keyword:
-        kw_part = f'(ti:"{keyword}" OR abs:"{keyword}")'
+        kw_part = f'ti:"{keyword}" OR abs:"{keyword}"'
     else:
+        # For single words, add wildcard unless already present
         token = keyword if "*" in keyword else f"{keyword}*"
-        kw_part = f"(ti:{token} OR abs:{token})"
+        kw_part = f"ti:{token} OR abs:{token}"
 
+    # Add category filter if specified
     if cats:
         cat_part = " OR ".join(f"cat:{c}" for c in cats if c.strip())
-        if cat_part:
-            return f"({cat_part}) AND {kw_part}"
+        return f"({cat_part}) AND ({kw_part})"
 
     return kw_part
 
@@ -182,6 +184,7 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
         papers = []
         keywords = config.get("keywords", [])
 
+        # Process each keyword separately to get more comprehensive results
         for keyword in keywords:
             try:
                 query = make_query(keyword, config.get("categories", []))
@@ -190,29 +193,54 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
                 entries = fetch_entries(query, max_results)
 
                 for entry in entries:
+                    # Time window filter first (most selective)
                     if not is_in_time_window(entry):
                         continue
 
+                    # Deduplication across all topics and keywords
                     entry_id = getattr(entry, "id", "")
+                    if not entry_id:
+                        continue
+
                     uid = hashlib.sha1(entry_id.encode()).hexdigest()
                     if uid in seen_ids:
                         continue
                     seen_ids.add(uid)
 
+                    # Extract and clean text
                     title = " ".join(getattr(entry, "title", "").split())
                     abstract = " ".join(getattr(entry, "summary", "").split())
 
-                    if any(excl in abstract.lower() for excl in GLOBAL_EXCLUDE):
+                    if not title or not abstract:
                         continue
+
+                    # Apply global exclusions
+                    title_lower = title.lower()
+                    abstract_lower = abstract.lower()
+                    if any(
+                        excl in title_lower or excl in abstract_lower
+                        for excl in GLOBAL_EXCLUDE
+                    ):
+                        continue
+
+                    # Build paper info
+                    authors_list = getattr(entry, "authors", [])
+                    authors_str = ", ".join(
+                        getattr(a, "name", "") for a in authors_list
+                    )
+
+                    tags_list = getattr(entry, "tags", [])
+                    categories_list = [
+                        getattr(t, "term", "") for t in tags_list if hasattr(t, "term")
+                    ]
 
                     paper_info = {
                         "title": truncate(title, TITLE_MAX),
                         "link": getattr(entry, "link", ""),
                         "abstract": truncate(abstract, ABSTRACT_MAX),
-                        "authors": ", ".join(
-                            a.name for a in getattr(entry, "authors", [])
-                        ),
-                        "categories": [t.term for t in getattr(entry, "tags", [])],
+                        "authors": truncate(authors_str, 100),
+                        "categories": categories_list,
+                        "matched_keyword": keyword,  # Track which keyword matched
                     }
 
                     if AI_SUMMARIZE:
@@ -220,10 +248,13 @@ def collect_papers(topics: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
 
                     papers.append(paper_info)
 
-            except Exception:
+            except Exception as e:
+                print(f"Error processing keyword '{keyword}': {e}")
                 continue
 
         if papers:
+            # Sort by publication date (most recent first)
+            papers.sort(key=lambda p: p.get("link", ""), reverse=True)
             output[topic] = papers
 
     return output
