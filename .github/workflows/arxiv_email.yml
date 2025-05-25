@@ -2,8 +2,14 @@ name: arXiv Email Notifier
 
 on:
   schedule:
-    - cron: '0 0 * * *'       # 00:05 UTC --> 09:05 KST
-  workflow_dispatch:           # 수동 실행 허용
+    - cron: '0 0 * * *'       # 00:00 UTC --> 09:00 KST
+  workflow_dispatch: 
+    inputs:
+      window_days:
+        description: 'Time window in days'
+        required: false
+        default: '1'
+        type: string
 
 jobs:
   send-email:
@@ -23,3 +29,4 @@ jobs:
           OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY }}   # AI_SUMMARIZE=True일 때만 필요
         run: |
           python arxiv_notifier.py
+          
