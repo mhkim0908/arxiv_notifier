@@ -51,6 +51,7 @@
     },
     "Neutral Atom Quantum Computing": {
         "keywords": [
+            "neutral atom arrays",
             "neutral atom quantum computing",
             "neutral atom quantum information",
             "neutral atom quantum processor",
@@ -59,6 +60,7 @@
             "rydberg qubit",
             "rydberg atom array",
             "atomic array",
+            "atomic arrays",
             "neutral atom quantum gate",
             "rydberg blockade",
             "optical tweezers for atoms",
@@ -69,7 +71,8 @@
             "non-destructive readout",
             "quantum software",
             "quantum control",
-            "programmable quantum simulator"
+            "programmable quantum simulator",
+            "quantum circuit"
         ],
         "categories": [
             "quant-ph",
